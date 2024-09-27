@@ -1,0 +1,50 @@
+--- a/src/components/ImageUploader.tsx
++++ b/src/components/ImageUploader.tsx
+@@ -1,5 +1,5 @@
+ import axios, { AxiosResponse } from 'axios';
+-import React, { useState } from 'react';
++import React, { useState, ChangeEvent } from 'react';
+ 
+ interface UploadResponse {
+   images: string[];
+@@ -9,32 +9,35 @@ function ImageUploader() {
+   const [extractedImages, setExtractedImages] = useState<string[]>([]);
+   const [isLoading, setIsLoading] = useState(false);
+ 
+-  const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
++  const handleUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+     if (!event.target.files) return;
+     
+     setIsLoading(true);
+     const formData = new FormData();
+     formData.append('file', event.target.files[0]);
+ 
+     try {
+-      const response: AxiosResponse<UploadResponse> = await axios.post('/api/upload', formData, {
++      const response: AxiosResponse<UploadResponse> = await axios.post<UploadResponse>('/api/upload', formData, {
+         headers: {
+           'Content-Type': 'multipart/form-data',
+         },
+       });
+ 
+-      console.log('Upload response:', response.data);
+-      setExtractedImages(response.data.images);
++      const uploadResponse = response.data;
++      console.log('Upload response:', uploadResponse);
++      setExtractedImages(uploadResponse.images);
+     } catch (error) {
+       console.error('Error uploading zip file:', error);
+       // Handle error (e.g., show error message to user)
+     } finally {
+       setIsLoading(false);
+     }
+   };
+ 
+   return (
+     <div>
++      <h1>Image Uploader</h1>
+       <input type="file" onChange={handleUpload} accept=".zip" />
++      {isLoading && <p>Uploading...</p>}
+       {isLoading && <p>Loading...</p>}
+       {extractedImages.length > 0 && (
+         <div>
