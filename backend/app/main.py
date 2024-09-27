@@ -198,8 +198,15 @@ async def upload_zip(zipfile: UploadFile = File(...)):
         logger.error(f"Error processing zip file: {str(e)}", exc_info=True)
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
+from pydantic import BaseModel
+from typing import List
+
+class ImageInfo(BaseModel):
+    filename: str
+    label: str
+
 class DownloadRequest(BaseModel):
-    images: List[str]
+    images: List[ImageInfo]
 
 @app.post("/api/download-images")
 async def download_images(request: DownloadRequest):
@@ -207,7 +214,7 @@ async def download_images(request: DownloadRequest):
     current_dir = os.getcwd()
     logger.info(f"Current working directory: {current_dir}")
     
-    zip_filename = f"selected_images_{uuid.uuid4()}.zip"
+    zip_filename = f"labeled_images_{uuid.uuid4()}.zip"
     zip_filepath = os.path.join(current_dir, zip_filename)
     temp_dir = os.path.join(current_dir, f"temp_download_{uuid.uuid4()}")
     
@@ -217,16 +224,21 @@ async def download_images(request: DownloadRequest):
         logger.info(f"Created temporary directory: {temp_dir}")
 
         # Copy selected images to the temporary directory
-        for image_filename in request.images:
-            full_path = os.path.join(current_dir, "uploads", image_filename)
-            logger.info(f"Attempting to copy file: {full_path}")
+        for image in request.images:
+            label_dir = os.path.join(temp_dir, image.label)
+            os.makedirs(label_dir, exist_ok=True)
+            
+            full_path = os.path.join(current_dir, "uploads", image.filename)
+            dest_path = os.path.join(label_dir, image.filename)
+            
+            logger.info(f"Attempting to copy file: {full_path} to {dest_path}")
             if os.path.exists(full_path):
-                shutil.copy(full_path, temp_dir)
-                logger.info(f"Copied file: {full_path}")
+                shutil.copy(full_path, dest_path)
+                logger.info(f"Copied file: {full_path} to {dest_path}")
             else:
                 logger.warning(f"Image not found: {full_path}")
 
-        # Create a zip file containing the selected images
+        # Create a zip file containing the labeled images
         logger.info(f"Creating zip file: {zip_filepath}")
         shutil.make_archive(zip_filepath[:-4], 'zip', temp_dir)
         logger.info(f"Zip file created: {zip_filepath}")

@@ -21,14 +21,20 @@ interface ProgressEvent {
   total?: number;
 }
 
+interface LabeledImage {
+  url: string;
+  label: string;
+}
+
 const ImageUploader: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [extractedImages, setExtractedImages] = useState<string[]>([]);
+  const [extractedImages, setExtractedImages] = useState<LabeledImage[]>([]);
   const [totalImages, setTotalImages] = useState(0);
   const [page, setPage] = useState(1);
   const [progress, setProgress] = useState(0);
-  const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
+  const [labels, setLabels] = useState<string[]>(['None']);
+  const [newLabel, setNewLabel] = useState('');
 
   const imagesPerPage = 20;
 
@@ -37,24 +43,24 @@ const ImageUploader: React.FC = () => {
     clearImages();
   }, []);
 
-  const clearImages = async () => {
-    try {
-      await axios.post(`${API_URL}/api/clear-images`);
-      setExtractedImages([]);
-      setTotalImages(0);
-      setPage(1);
-      setSelectedImages(new Set());
-    } catch (error) {
-      console.error('Error clearing images:', error);
-    }
-  };
-
   useEffect(() => {
     console.log('useEffect triggered, page:', page);
     if (page > 1) {
       fetchImages(false);
     }
   }, [page]);
+
+  const clearImages = async () => {
+    try {
+      await axios.post(`${API_URL}/api/clear-images`);
+      setExtractedImages([]);
+      setTotalImages(0);
+      setPage(1);
+      setLabels(['None']);
+    } catch (error) {
+      console.error('Error clearing images:', error);
+    }
+  };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -76,7 +82,6 @@ const ImageUploader: React.FC = () => {
     setExtractedImages([]);
     setTotalImages(0);
     setPage(1);
-    setSelectedImages(new Set());
     const formData = new FormData();
     formData.append('zipfile', selectedFile);
 
@@ -95,7 +100,7 @@ const ImageUploader: React.FC = () => {
       });
       console.log('Upload response:', response.data);
       setTotalImages(response.data.total);
-      const newImages = response.data.images.map((img: string) => `${API_URL}${img}`);
+      const newImages = response.data.images.map((img: string) => ({ url: `${API_URL}${img}`, label: 'None' }));
       console.log('New images:', newImages);
       setExtractedImages(newImages);
       setIsLoading(false);
@@ -124,7 +129,7 @@ const ImageUploader: React.FC = () => {
         params: { page: reset ? 1 : page, limit: imagesPerPage },
       });
       console.log('Fetched images response:', response.data);
-      const newImages = response.data.images.map(img => `${API_URL}${img.url}`);
+      const newImages = response.data.images.map(img => ({ url: `${API_URL}${img.url}`, label: 'None' }));
       console.log('New images:', newImages);
       setExtractedImages(prevImages => {
         if (reset) {
@@ -146,35 +151,31 @@ const ImageUploader: React.FC = () => {
 
   const handleLoadMore = () => {
     console.log('handleLoadMore called');
-    setPage(prevPage => {
-      const newPage = prevPage + 1;
-      console.log('New page:', newPage);
-      return newPage;
-    });
+    setPage(prevPage => prevPage + 1);
   };
 
-  const handleCheckboxChange = (imageSrc: string) => {
-    console.log('handleCheckboxChange called for:', imageSrc);
-    setSelectedImages((prevSelected) => {
-      const newSelected = new Set(prevSelected);
-      if (newSelected.has(imageSrc)) {
-        newSelected.delete(imageSrc);
-      } else {
-        newSelected.add(imageSrc);
-      }
-      console.log('Updated selected images:', Array.from(newSelected));
-      return newSelected;
-    });
+  const handleAddLabel = () => {
+    if (newLabel && !labels.includes(newLabel)) {
+      setLabels([...labels, newLabel]);
+      setNewLabel('');
+    }
+  };
+
+  const handleLabelChange = (imageUrl: string, newLabel: string) => {
+    setExtractedImages(prevImages =>
+      prevImages.map(img =>
+        img.url === imageUrl ? { ...img, label: newLabel } : img
+      )
+    );
   };
 
   const handleDownload = async () => {
     console.log('handleDownload called');
-    console.log('Selected images:', Array.from(selectedImages));
     try {
-      const imagesToDownload = Array.from(selectedImages).map(imageSrc => {
-        const parts = imageSrc.split('/');
-        return parts[parts.length - 1];
-      });
+      const imagesToDownload = extractedImages.map(img => ({
+        filename: img.url.split('/').pop() || '',
+        label: img.label
+      }));
       console.log('Images to download:', imagesToDownload);
 
       const response = await axios.post(
@@ -194,7 +195,7 @@ const ImageUploader: React.FC = () => {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', 'selected_images.zip');
+      link.setAttribute('download', 'labeled_images.zip');
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -209,6 +210,9 @@ const ImageUploader: React.FC = () => {
           request: axiosError.request,
           config: axiosError.config
         });
+        if (axiosError.response) {
+          console.error('Response data:', await axiosError.response.data.text());
+        }
         alert(`Error downloading images: ${axiosError.message}\nResponse: ${JSON.stringify(axiosError.response?.data)}`);
       } else {
         alert(`Error downloading images: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -220,34 +224,68 @@ const ImageUploader: React.FC = () => {
 
   return (
     <div className="image-uploader">
-      <input type="file" accept=".zip" onChange={handleFileChange} />
-      <button onClick={handleUpload} disabled={!selectedFile || isLoading}>
-        {isLoading ? 'Uploading...' : 'Upload Zip File'}
-      </button>
-      {isLoading && (
-        <div className="progress-container">
-          <Spinner />
-          <progress value={progress} max="100" />
-          <p>{progress}% Uploaded</p>
-        </div>
-      )}
-      <div className="image-grid">
-        {extractedImages.map((imageSrc, index) => (
-          <div key={index} className="image-container">
-            <img src={imageSrc} alt={`Extracted ${index + 1}`} loading="lazy" />
-            <input
-              type="checkbox"
-              checked={selectedImages.has(imageSrc)}
-              onChange={() => handleCheckboxChange(imageSrc)}
-            />
+      <div className="upload-section">
+        <h2>Upload Zip File</h2>
+        <input type="file" accept=".zip" onChange={handleFileChange} />
+        <button onClick={handleUpload} disabled={!selectedFile || isLoading}>
+          {isLoading ? 'Uploading...' : 'Upload Zip File'}
+        </button>
+        {isLoading && (
+          <div className="progress-container">
+            <Spinner />
+            <progress value={progress} max="100" />
+            <p>{progress}% Uploaded</p>
           </div>
-        ))}
+        )}
       </div>
-      {extractedImages.length < totalImages && (
-        <button onClick={handleLoadMore}>Load More</button>
-      )}
-      {selectedImages.size > 0 && (
-        <button onClick={handleDownload}>Download Selected Images</button>
+
+      <div className="label-section">
+        <h2>Add Labels</h2>
+        <div className="label-input">
+          <input
+            type="text"
+            value={newLabel}
+            onChange={(e) => setNewLabel(e.target.value)}
+            placeholder="Enter new label"
+          />
+          <button onClick={handleAddLabel}>Add Label</button>
+        </div>
+        <div className="label-list">
+          <h3>Current Labels:</h3>
+          <ul>
+            {labels.map((label, index) => (
+              <li key={index}>{label}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
+      <div className="image-gallery">
+        <h2>Image Gallery</h2>
+        <div className="image-grid">
+          {extractedImages.map((image, index) => (
+            <div key={index} className="image-container">
+              <img src={image.url} alt={`Extracted ${index + 1}`} loading="lazy" />
+              <select
+                value={image.label}
+                onChange={(e) => handleLabelChange(image.url, e.target.value)}
+              >
+                {labels.map((label, i) => (
+                  <option key={i} value={label}>{label}</option>
+                ))}
+              </select>
+            </div>
+          ))}
+        </div>
+        {extractedImages.length < totalImages && (
+          <button onClick={handleLoadMore}>Load More</button>
+        )}
+      </div>
+
+      {extractedImages.length > 0 && (
+        <div className="download-section">
+          <button onClick={handleDownload}>Download Labeled Images</button>
+        </div>
       )}
     </div>
   );

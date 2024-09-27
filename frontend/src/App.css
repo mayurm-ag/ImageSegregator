@@ -15,6 +15,21 @@
 
 .image-uploader {
   margin: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.upload-section,
+.label-section,
+.image-gallery,
+.download-section {
+  width: 100%;
+  max-width: 800px;
+  margin-bottom: 20px;
+  padding: 20px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
 }
 
 .progress-container {
@@ -31,9 +46,11 @@
 
 .image-container {
   width: 200px;
-  height: 220px;
+  height: 250px;
   overflow: hidden;
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 .image-container img {
@@ -44,8 +61,13 @@
 
 .image-container input[type="checkbox"] {
   position: absolute;
-  bottom: 5px;
+  top: 5px;
   left: 5px;
+}
+
+.image-container select {
+  width: 100%;
+  margin-top: 5px;
 }
 
 .spinner {
@@ -73,4 +95,51 @@ button {
 progress {
   width: 100%;
   height: 20px;
+}
+
+.label-list {
+  margin-top: 20px;
+  text-align: left;
+}
+
+.label-list ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+.label-list li {
+  margin-bottom: 5px;
+}
+
+.download-section {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.download-section button {
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  transition: background-color 0.3s;
+}
+
+.download-section button:hover {
+  background-color: #45a049;
+}
+
+.download-section button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.download-section button.active {
+  background-color: #4CAF50;
+}
+
+.download-section button.inactive {
+  background-color: #cccccc;
 }
