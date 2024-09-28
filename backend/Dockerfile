@@ -2,14 +2,23 @@ FROM python:3.9
 
 WORKDIR /app
 
-COPY . .
+# Install netcat and postgresql-client
+RUN apt-get update && apt-get install -y netcat-openbsd postgresql-client
 
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Add wait-for-it script
-ADD https://github.com/vishnubob/wait-for-it/raw/master/wait-for-it.sh /usr/local/bin/wait-for-it
-RUN chmod +x /usr/local/bin/wait-for-it
+COPY . .
 
-EXPOSE 8000
+# Make the wait-for-it.sh script executable
+COPY wait-for-it.sh /wait-for-it.sh
+RUN chmod +x /wait-for-it.sh
 
-CMD ["wait-for-it", "db:5432", "--", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Create a startup script
+RUN echo '#!/bin/sh' > /start.sh && \
+    echo 'alembic upgrade head' >> /start.sh && \
+    echo 'uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload' >> /start.sh && \
+    chmod +x /start.sh
+
+# Run migrations and start the application
+CMD ["/wait-for-it.sh", "db", "/start.sh"]

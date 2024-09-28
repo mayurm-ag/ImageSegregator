@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Spinner from './Spinner';
-import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { saveAs } from 'file-saver';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://100.64.0.60:8000';
 
@@ -54,59 +54,35 @@ const GalleryPage: React.FC = () => {
     }
   };
 
-  const handleLabelChange = (imageId: number, newLabel: string) => {
-    setImages((prevImages: Image[]) =>
-      prevImages.map((img: Image) =>
-        img.id === imageId ? { ...img, label: newLabel } : img
-      )
-    );
+  const handleLabelChange = async (imageId: number, newLabel: string) => {
+    try {
+      await axios.post(`${API_URL}/api/update-label`, { image_id: imageId, label: newLabel });
+      setImages((prevImages: Image[]) =>
+        prevImages.map((img: Image) =>
+          img.id === imageId ? { ...img, label: newLabel } : img
+        )
+      );
+      // Remove the toast.success call
+    } catch (error) {
+      console.error('Error updating label:', error);
+      // Remove the toast.error call
+    }
   };
 
   const handleDownload = async () => {
     setIsDownloading(true);
     try {
-      const allImages = await fetchAllImages();
-      const imagesToDownload = allImages.map(img => ({
-        filename: img.url.split('/').pop() || '',
-        label: img.label
-      }));
-
-      const response = await axios.post(
-        `${API_URL}/api/download-images`,
-        { images: imagesToDownload },
-        { 
-          responseType: 'blob',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/zip',
-          },
-          timeout: 30000, // Set a 30-second timeout
-        }
-      );
+      const response = await axios.get(`${API_URL}/api/download-all-images`, {
+        responseType: 'blob',
+      });
 
       const blob = new Blob([response.data], { type: 'application/zip' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', 'labeled_images.zip');
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-      toast.success('Images downloaded successfully!');
+      saveAs(blob, 'labeled_images.zip');
+
+      console.log('Images downloaded successfully!');
     } catch (error) {
       console.error('Error downloading images:', error);
-      if (axios.isAxiosError(error)) {
-        if (error.response) {
-          toast.error(`Error: ${error.response.status} - ${error.response.statusText}`);
-        } else if (error.request) {
-          toast.error('No response received from the server. Please try again.');
-        } else {
-          toast.error(`Error: ${error.message}`);
-        }
-      } else {
-        toast.error('An unexpected error occurred. Please try again.');
-      }
+      console.error('An error occurred while downloading images. Please try again.');
     } finally {
       setIsDownloading(false);
     }
@@ -232,7 +208,7 @@ const GalleryPage: React.FC = () => {
       <div className="image-grid">
         {images.map((image: Image) => (
           <div key={image.id} className="image-container">
-            <img src={`${API_URL}${image.url}`} alt={`Image ${image.id}`} />
+            <img src={image.url} alt={`Image ${image.id}`} />
             <select
               value={image.label}
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleLabelChange(image.id, e.target.value)}
@@ -255,7 +231,6 @@ const GalleryPage: React.FC = () => {
       <button onClick={handleDownload} disabled={isDownloading}>
         {isDownloading ? <Spinner /> : 'Download All Labeled Images'}
       </button>
-      <ToastContainer position="bottom-right" />
     </div>
   );
 };
