@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List
@@ -49,7 +49,7 @@ clear_uploads_directory()
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://192.168.10.144:3000"],  # Make sure this matches your frontend URL
+    allow_origins=["http://100.64.0.60:3000"],  # Make sure this matches your frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -110,7 +110,7 @@ async def upload_images(images: List[UploadFile] = File(...)):
             logger.info(f"File saved: {filename}")
             
             db = SessionLocal()
-            db_image = Image(filename=filename, url=f"http://192.168.10.144:8000/uploads/{filename}")
+            db_image = Image(filename=filename, url=f"http://100.64.0.60:8000/uploads/{filename}")
             db.add(db_image)
             db.commit()
             db.close()
@@ -139,7 +139,7 @@ async def get_images(page: int = 1, limit: int = 20):
     return {"images": image_list, "total": total_images}
 
 @app.post("/api/upload-zip")
-async def upload_zip(zipfile: UploadFile = File(...)):
+async def upload_zip(background_tasks: BackgroundTasks, zipfile: UploadFile = File(...)):
     logger.info(f"Received zip file upload: {zipfile.filename}")
     try:
         # Clear all existing images
@@ -156,6 +156,15 @@ async def upload_zip(zipfile: UploadFile = File(...)):
         contents = await zipfile.read()
         logger.info(f"Zip file size: {len(contents)} bytes")
         
+        background_tasks.add_task(process_zip_file, contents)
+        
+        return JSONResponse(content={"message": "Zip file upload started. Processing in background."})
+    except Exception as e:
+        logger.error(f"Error processing zip file: {str(e)}", exc_info=True)
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+async def process_zip_file(contents: bytes):
+    try:
         with ZipFile(BytesIO(contents)) as zip_file:
             extracted_images = []
             for file_name in zip_file.namelist():
@@ -182,21 +191,13 @@ async def upload_zip(zipfile: UploadFile = File(...)):
                     db.commit()
                     db.close()
                     
+                    logger.info(f"Saved image: {file_path}")
                     extracted_images.append(f"/uploads/{unique_filename}")
             
             logger.info(f"Extracted and saved {len(extracted_images)} images from the zip file")
-            
-            # Double-check the number of images in the database
-            db = SessionLocal()
-            total_images = db.query(Image).count()
-            db.close()
-            
-            logger.info(f"Total images in database after upload: {total_images}")
-            
-            return JSONResponse(content={"images": extracted_images, "total": total_images})
+            logger.info(f"Extracted images: {extracted_images}")
     except Exception as e:
-        logger.error(f"Error processing zip file: {str(e)}", exc_info=True)
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        logger.error(f"Error processing zip file in background: {str(e)}", exc_info=True)
 
 from pydantic import BaseModel
 from typing import List

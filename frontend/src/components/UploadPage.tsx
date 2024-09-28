@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Spinner from './Spinner';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://192.168.10.144:8000';
+const API_URL = process.env.REACT_APP_API_URL || 'http://100.64.0.60:8000';
 
 const UploadPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -39,6 +39,7 @@ const UploadPage: React.FC = () => {
     formData.append('zipfile', selectedFile);
 
     try {
+      console.log(`Sending POST request to ${API_URL}/api/upload-zip`);
       const response = await axios.post(`${API_URL}/api/upload-zip`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -49,8 +50,10 @@ const UploadPage: React.FC = () => {
         },
       });
 
-      if (response.data && response.data.images) {
+      if (response.data && response.data.message) {
         setUploadComplete(true);
+        // Navigate to the gallery page after successful upload
+        navigate('/gallery', { state: { labels } });
       }
     } catch (error) {
       console.error('Error uploading zip file:', error);

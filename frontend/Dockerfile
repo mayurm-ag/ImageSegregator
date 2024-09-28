@@ -10,17 +10,11 @@ COPY package*.json ./
 # Install any needed packages specified in package.json
 RUN npm install
 
-# Copy the src directory
-COPY src ./src
+# Install TypeScript type definitions for lodash
+RUN npm install --save-dev @types/lodash
 
-# Copy the public directory
-COPY public ./public
-
-# Copy tsconfig.json if it exists
-COPY tsconfig.json ./tsconfig.json
-
-# Copy .env file if it exists
-COPY .env* ./
+# Copy the rest of the application code
+COPY . .
 
 # Build the app
 RUN npm run build

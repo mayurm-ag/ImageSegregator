@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import axios, { AxiosError } from 'axios';
 import { logger } from '../utils/logger';
 import Spinner from './Spinner';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://192.168.10.144:8000';
+const API_URL = process.env.REACT_APP_API_URL || 'http://100.64.0.60:8000';
 console.log('API_URL:', API_URL);
 
 interface UploadResponse {
@@ -106,18 +108,8 @@ const ImageUploader: React.FC = () => {
       setIsLoading(false);
     } catch (error) {
       console.error('Error uploading zip file:', error);
-      if (axios.isAxiosError(error)) {
-        const axiosError = error as AxiosError;
-        console.error('Axios error details:', {
-          message: axiosError.message,
-          response: axiosError.response,
-          request: axiosError.request,
-          config: axiosError.config
-        });
-        alert(`Error uploading zip file: ${axiosError.message}\nResponse: ${JSON.stringify(axiosError.response?.data)}`);
-      } else {
-        alert(`Error uploading zip file: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
+      toast.error('Failed to upload zip file. Please try again.');
+    } finally {
       setIsLoading(false);
     }
   };
@@ -224,6 +216,7 @@ const ImageUploader: React.FC = () => {
 
   return (
     <div className="image-uploader">
+      <ToastContainer />
       <div className="upload-section">
         <h2>Upload Zip File</h2>
         <input type="file" accept=".zip" onChange={handleFileChange} />
