@@ -27,6 +27,10 @@ const UploadPage: React.FC = () => {
     }
   };
 
+  const handleDeleteLabel = (labelToDelete: string) => {
+    setLabels(labels.filter(label => label !== labelToDelete));
+  };
+
   const handleUpload = async () => {
     if (!selectedFile) {
       alert('Please select a file to upload');
@@ -39,7 +43,6 @@ const UploadPage: React.FC = () => {
     formData.append('zipfile', selectedFile);
 
     try {
-      console.log(`Sending POST request to ${API_URL}/api/upload-zip`);
       const response = await axios.post(`${API_URL}/api/upload-zip`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -52,8 +55,6 @@ const UploadPage: React.FC = () => {
 
       if (response.data && response.data.message) {
         setUploadComplete(true);
-        // Navigate to the gallery page after successful upload
-        navigate('/gallery', { state: { labels } });
       }
     } catch (error) {
       console.error('Error uploading zip file:', error);
@@ -70,11 +71,6 @@ const UploadPage: React.FC = () => {
   return (
     <div className="upload-page">
       <h1>Upload Zip File</h1>
-      {uploadComplete && (
-        <button className="proceed-button" onClick={handleProceed}>
-          Proceed to Gallery
-        </button>
-      )}
       <input type="file" accept=".zip" onChange={handleFileChange} />
       <button onClick={handleUpload} disabled={!selectedFile || isLoading}>
         {isLoading ? 'Uploading...' : 'Upload'}
@@ -99,11 +95,21 @@ const UploadPage: React.FC = () => {
           <h3>Current Labels:</h3>
           <ul>
             {labels.map((label, index) => (
-              <li key={index}>{label}</li>
+              <li key={index}>
+                {label}
+                {label !== 'None' && (
+                  <button onClick={() => handleDeleteLabel(label)}>Delete</button>
+                )}
+              </li>
             ))}
           </ul>
         </div>
       </div>
+      {uploadComplete && (
+        <button className="proceed-button" onClick={handleProceed}>
+          Proceed to Gallery
+        </button>
+      )}
     </div>
   );
 };
