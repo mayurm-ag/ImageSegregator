@@ -151,14 +151,14 @@ async def process_zip_file(contents: bytes):
 async def get_images(page: int = 1, limit: int = 20):
     db = SessionLocal()
     offset = (page - 1) * limit
-    images = db.query(Image).offset(offset).limit(limit).all()
+    images = db.query(Image).order_by(Image.id).offset(offset).limit(limit).all()
     total_images = db.query(Image).count()
     db.close()
     return {
         "images": [
             {
                 "id": img.id,
-                "url": f"http://100.64.0.60:8000{img.url}",  # Adjust this URL to match your backend URL
+                "url": f"http://100.64.0.60:8000{img.url}",
                 "label": img.label
             } for img in images
         ],

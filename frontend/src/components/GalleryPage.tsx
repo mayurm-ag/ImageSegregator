@@ -40,11 +40,22 @@ const GalleryPage: React.FC = () => {
   const fetchImages = async (page: number) => {
     setIsLoading(true);
     try {
-      const response = await axios.get<{ images: ApiImage[], total: number }>(`${API_URL}/api/images`, {
+      const response = await axios.get<{ images: Image[], total: number }>(`${API_URL}/api/images`, {
         params: { page, limit: imagesPerPage }
       });
-      const newImages: Image[] = response.data.images.map((img: ApiImage) => ({ ...img, label: 'None' }));
-      setImages(newImages);
+      setImages(prevImages => {
+        const newImages = response.data.images;
+        const updatedImages = [...prevImages];
+        newImages.forEach(newImage => {
+          const index = updatedImages.findIndex(img => img.id === newImage.id);
+          if (index !== -1) {
+            updatedImages[index] = { ...updatedImages[index], ...newImage };
+          } else {
+            updatedImages.push(newImage);
+          }
+        });
+        return updatedImages.sort((a, b) => a.id - b.id);
+      });
       setTotalImages(response.data.total);
       setTotalPages(Math.ceil(response.data.total / imagesPerPage));
     } catch (error) {
@@ -57,15 +68,13 @@ const GalleryPage: React.FC = () => {
   const handleLabelChange = async (imageId: number, newLabel: string) => {
     try {
       await axios.post(`${API_URL}/api/update-label`, { image_id: imageId, label: newLabel });
-      setImages((prevImages: Image[]) =>
-        prevImages.map((img: Image) =>
+      setImages(prevImages =>
+        prevImages.map(img =>
           img.id === imageId ? { ...img, label: newLabel } : img
         )
       );
-      // Remove the toast.success call
     } catch (error) {
       console.error('Error updating label:', error);
-      // Remove the toast.error call
     }
   };
 
@@ -206,19 +215,21 @@ const GalleryPage: React.FC = () => {
       <h1>Image Gallery</h1>
       <button onClick={handleNavigateHome}>Back to Home</button>
       <div className="image-grid">
-        {images.map((image: Image) => (
-          <div key={image.id} className="image-container">
-            <img src={image.url} alt={`Image ${image.id}`} />
-            <select
-              value={image.label}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleLabelChange(image.id, e.target.value)}
-            >
-              {labels.map((label: string, index: number) => (
-                <option key={index} value={label}>{label}</option>
-              ))}
-            </select>
-          </div>
-        ))}
+        {images
+          .slice((currentPage - 1) * imagesPerPage, currentPage * imagesPerPage)
+          .map((image: Image) => (
+            <div key={image.id} className="image-container">
+              <img src={image.url} alt={`Image ${image.id}`} />
+              <select
+                value={image.label}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleLabelChange(image.id, e.target.value)}
+              >
+                {labels.map((label: string, index: number) => (
+                  <option key={index} value={label}>{label}</option>
+                ))}
+              </select>
+            </div>
+          ))}
       </div>
       <div className="pagination">
         <button onClick={() => handlePageChange(1)} disabled={currentPage === 1}>First</button>
