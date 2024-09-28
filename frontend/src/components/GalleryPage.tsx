@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Spinner from './Spinner';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://100.64.0.60:8000';
 
@@ -53,8 +55,8 @@ const GalleryPage: React.FC = () => {
   };
 
   const handleLabelChange = (imageId: number, newLabel: string) => {
-    setImages(prevImages =>
-      prevImages.map(img =>
+    setImages((prevImages: Image[]) =>
+      prevImages.map((img: Image) =>
         img.id === imageId ? { ...img, label: newLabel } : img
       )
     );
@@ -78,6 +80,7 @@ const GalleryPage: React.FC = () => {
             'Content-Type': 'application/json',
             'Accept': 'application/zip',
           },
+          timeout: 30000, // Set a 30-second timeout
         }
       );
 
@@ -90,9 +93,20 @@ const GalleryPage: React.FC = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
+      toast.success('Images downloaded successfully!');
     } catch (error) {
       console.error('Error downloading images:', error);
-      alert('Error downloading images. Please try again.');
+      if (axios.isAxiosError(error)) {
+        if (error.response) {
+          toast.error(`Error: ${error.response.status} - ${error.response.statusText}`);
+        } else if (error.request) {
+          toast.error('No response received from the server. Please try again.');
+        } else {
+          toast.error(`Error: ${error.message}`);
+        }
+      } else {
+        toast.error('An unexpected error occurred. Please try again.');
+      }
     } finally {
       setIsDownloading(false);
     }
@@ -114,7 +128,7 @@ const GalleryPage: React.FC = () => {
     }
 
     return allImages.map(img => {
-      const matchingImage = images.find(i => i.id === img.id);
+      const matchingImage = images.find((i: Image) => i.id === img.id);
       return matchingImage ? { ...img, label: matchingImage.label } : img;
     });
   };
@@ -128,7 +142,7 @@ const GalleryPage: React.FC = () => {
   };
 
   const renderPageNumbers = () => {
-    const pageNumbers = [];
+    const pageNumbers: JSX.Element[] = [];
     const totalPageNumbers = 7; // Total number of page buttons to show
     const sidePageNumbers = 2; // Number of pages to show on each side of the current page
 
@@ -216,14 +230,14 @@ const GalleryPage: React.FC = () => {
       <h1>Image Gallery</h1>
       <button onClick={handleNavigateHome}>Back to Home</button>
       <div className="image-grid">
-        {images.map((image) => (
+        {images.map((image: Image) => (
           <div key={image.id} className="image-container">
             <img src={`${API_URL}${image.url}`} alt={`Image ${image.id}`} />
             <select
               value={image.label}
-              onChange={(e) => handleLabelChange(image.id, e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleLabelChange(image.id, e.target.value)}
             >
-              {labels.map((label, index) => (
+              {labels.map((label: string, index: number) => (
                 <option key={index} value={label}>{label}</option>
               ))}
             </select>
@@ -241,6 +255,7 @@ const GalleryPage: React.FC = () => {
       <button onClick={handleDownload} disabled={isDownloading}>
         {isDownloading ? <Spinner /> : 'Download All Labeled Images'}
       </button>
+      <ToastContainer position="bottom-right" />
     </div>
   );
 };

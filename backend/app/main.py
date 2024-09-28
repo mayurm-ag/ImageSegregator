@@ -18,6 +18,8 @@ import shutil
 from zipfile import ZipFile
 from pydantic import BaseModel
 import asyncio
+import io
+from starlette.responses import StreamingResponse
 
 # Create logs directory if it doesn't exist
 os.makedirs('logs', exist_ok=True)
@@ -217,17 +219,25 @@ class DownloadRequest(BaseModel):
 
 @app.post("/api/download-images")
 async def download_images(request: DownloadRequest):
-    def generate_zip():
-        with io.BytesIO() as buffer:
-            with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-                for image in request.images:
-                    # Add each image to the zip file
-                    # Yield chunks of the buffer periodically
-                    yield buffer.getvalue()
-                    buffer.seek(0)
-                    buffer.truncate()
-    
-    return StreamingResponse(generate_zip(), media_type="application/zip", headers={"Content-Disposition": f"attachment; filename=labeled_images.zip"})
+    try:
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            for image in request.images:
+                file_path = os.path.join("uploads", image.filename)
+                if os.path.exists(file_path):
+                    zip_file.write(file_path, arcname=f"{image.label}/{image.filename}")
+                else:
+                    logger.warning(f"File not found: {file_path}")
+
+        buffer.seek(0)
+        return StreamingResponse(
+            iter([buffer.getvalue()]),
+            media_type="application/zip",
+            headers={"Content-Disposition": f"attachment; filename=labeled_images.zip"}
+        )
+    except Exception as e:
+        logger.error(f"Error creating zip file: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error creating zip file: {str(e)}")
 
 @app.post("/api/clear-images")
 async def clear_images():
