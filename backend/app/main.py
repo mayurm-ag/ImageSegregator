@@ -1,5 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List
 import os
@@ -38,8 +38,13 @@ def clear_uploads_directory():
     uploads_dir = "uploads"
     for filename in os.listdir(uploads_dir):
         file_path = os.path.join(uploads_dir, filename)
-        if os.path.isfile(file_path):
-            os.unlink(file_path)
+        try:
+            if os.path.isfile(file_path):
+                os.unlink(file_path)
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
+        except Exception as e:
+            logger.error(f"Error deleting {file_path}: {str(e)}")
     logger.info("Cleared uploads directory")
 
 # Call this function right after the app initialization
@@ -195,7 +200,8 @@ async def process_zip_file(contents: bytes):
                     extracted_images.append(f"/uploads/{unique_filename}")
             
             logger.info(f"Extracted and saved {len(extracted_images)} images from the zip file")
-            logger.info(f"Extracted images: {extracted_images}")
+            # Remove the following line to stop logging the entire list of extracted images
+            # logger.info(f"Extracted images: {extracted_images}")
     except Exception as e:
         logger.error(f"Error processing zip file in background: {str(e)}", exc_info=True)
 
@@ -211,78 +217,17 @@ class DownloadRequest(BaseModel):
 
 @app.post("/api/download-images")
 async def download_images(request: DownloadRequest):
-    logger.info(f"Received request to download {len(request.images)} images")
-    current_dir = os.getcwd()
-    logger.info(f"Current working directory: {current_dir}")
+    def generate_zip():
+        with io.BytesIO() as buffer:
+            with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                for image in request.images:
+                    # Add each image to the zip file
+                    # Yield chunks of the buffer periodically
+                    yield buffer.getvalue()
+                    buffer.seek(0)
+                    buffer.truncate()
     
-    zip_filename = f"labeled_images_{uuid.uuid4()}.zip"
-    zip_filepath = os.path.join(current_dir, zip_filename)
-    temp_dir = os.path.join(current_dir, f"temp_download_{uuid.uuid4()}")
-    
-    try:
-        # Create a temporary directory to store the images
-        os.makedirs(temp_dir, exist_ok=True)
-        logger.info(f"Created temporary directory: {temp_dir}")
-
-        # Copy selected images to the temporary directory
-        for image in request.images:
-            label_dir = os.path.join(temp_dir, image.label)
-            os.makedirs(label_dir, exist_ok=True)
-            
-            full_path = os.path.join(current_dir, "uploads", image.filename)
-            dest_path = os.path.join(label_dir, image.filename)
-            
-            logger.info(f"Attempting to copy file: {full_path} to {dest_path}")
-            if os.path.exists(full_path):
-                shutil.copy(full_path, dest_path)
-                logger.info(f"Copied file: {full_path} to {dest_path}")
-            else:
-                logger.warning(f"Image not found: {full_path}")
-
-        # Create a zip file containing the labeled images
-        logger.info(f"Creating zip file: {zip_filepath}")
-        shutil.make_archive(zip_filepath[:-4], 'zip', temp_dir)
-        logger.info(f"Zip file created: {zip_filepath}")
-
-        # Check if the zip file was created successfully
-        if not os.path.exists(zip_filepath):
-            raise FileNotFoundError(f"Failed to create zip file: {zip_filepath}")
-
-        # Get the file size
-        file_size = os.path.getsize(zip_filepath)
-        logger.info(f"Zip file size: {file_size} bytes")
-
-        # Return the zip file
-        logger.info(f"Returning zip file: {zip_filepath}")
-        return FileResponse(
-            zip_filepath,
-            media_type="application/zip",
-            filename=zip_filename,
-            headers={"Content-Disposition": f"attachment; filename={zip_filename}"}
-        )
-    except Exception as e:
-        logger.error(f"Error creating zip file: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error creating zip file: {str(e)}")
-    finally:
-        # Clean up the temporary directory
-        if os.path.exists(temp_dir):
-            shutil.rmtree(temp_dir)
-            logger.info(f"Temporary directory removed: {temp_dir}")
-        
-        # Schedule zip file removal
-        cleanup_task = asyncio.create_task(delayed_cleanup(zip_filepath))
-        logger.info(f"Scheduled cleanup task for zip file: {zip_filepath}")
-
-async def delayed_cleanup(filepath: str, delay: int = 60):
-    """
-    Asynchronously delete a file after a specified delay.
-    """
-    await asyncio.sleep(delay)
-    try:
-        os.remove(filepath)
-        logger.info(f"Zip file removed after delay: {filepath}")
-    except Exception as e:
-        logger.error(f"Error removing zip file after delay: {str(e)}", exc_info=True)
+    return StreamingResponse(generate_zip(), media_type="application/zip", headers={"Content-Disposition": f"attachment; filename=labeled_images.zip"})
 
 @app.post("/api/clear-images")
 async def clear_images():

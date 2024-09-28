@@ -33,26 +33,16 @@ const GalleryPage: React.FC = () => {
       setLabels((location.state as any).labels);
     }
     fetchImages(currentPage);
-  }, [currentPage]);
+  }, [currentPage, location.state]);
 
   const fetchImages = async (page: number) => {
+    setIsLoading(true);
     try {
       const response = await axios.get<{ images: ApiImage[], total: number }>(`${API_URL}/api/images`, {
         params: { page, limit: imagesPerPage }
       });
       const newImages: Image[] = response.data.images.map((img: ApiImage) => ({ ...img, label: 'None' }));
-      setImages(prevImages => {
-        const updatedImages = [...prevImages];
-        newImages.forEach((newImg: Image) => {
-          const existingIndex = updatedImages.findIndex(img => img.id === newImg.id);
-          if (existingIndex !== -1) {
-            updatedImages[existingIndex] = { ...newImg, label: updatedImages[existingIndex].label };
-          } else {
-            updatedImages.push(newImg);
-          }
-        });
-        return updatedImages;
-      });
+      setImages(newImages);
       setTotalImages(response.data.total);
       setTotalPages(Math.ceil(response.data.total / imagesPerPage));
     } catch (error) {
@@ -114,10 +104,10 @@ const GalleryPage: React.FC = () => {
     let hasMoreImages = true;
 
     while (hasMoreImages) {
-      const response = await axios.get(`${API_URL}/api/images`, {
+      const response = await axios.get<{ images: ApiImage[], total: number }>(`${API_URL}/api/images`, {
         params: { page, limit: 1000 }
       });
-      const newImages = response.data.images.map((img: any) => ({ ...img, label: 'None' }));
+      const newImages = response.data.images.map((img: ApiImage) => ({ ...img, label: 'None' }));
       allImages = [...allImages, ...newImages];
       hasMoreImages = newImages.length === 1000;
       page++;
@@ -137,6 +127,86 @@ const GalleryPage: React.FC = () => {
     navigate('/');
   };
 
+  const renderPageNumbers = () => {
+    const pageNumbers = [];
+    const totalPageNumbers = 7; // Total number of page buttons to show
+    const sidePageNumbers = 2; // Number of pages to show on each side of the current page
+
+    if (totalPages <= totalPageNumbers) {
+      // If total pages are less than or equal to totalPageNumbers, show all pages
+      for (let i = 1; i <= totalPages; i++) {
+        pageNumbers.push(
+          <button
+            key={i}
+            onClick={() => handlePageChange(i)}
+            disabled={i === currentPage}
+          >
+            {i}
+          </button>
+        );
+      }
+    } else {
+      // Always show first page
+      pageNumbers.push(
+        <button
+          key={1}
+          onClick={() => handlePageChange(1)}
+          disabled={1 === currentPage}
+        >
+          1
+        </button>
+      );
+
+      // Calculate start and end page numbers
+      let startPage = Math.max(2, currentPage - sidePageNumbers);
+      let endPage = Math.min(totalPages - 1, currentPage + sidePageNumbers);
+
+      // Adjust in case we're too close to the start or end
+      if (startPage <= 3) {
+        endPage = Math.min(totalPages - 1, totalPageNumbers - 2);
+      }
+      if (endPage >= totalPages - 2) {
+        startPage = Math.max(2, totalPages - totalPageNumbers + 3);
+      }
+
+      // Add ellipsis if needed
+      if (startPage > 2) {
+        pageNumbers.push(<span key="ellipsis1">...</span>);
+      }
+
+      // Add page numbers
+      for (let i = startPage; i <= endPage; i++) {
+        pageNumbers.push(
+          <button
+            key={i}
+            onClick={() => handlePageChange(i)}
+            disabled={i === currentPage}
+          >
+            {i}
+          </button>
+        );
+      }
+
+      // Add ellipsis if needed
+      if (endPage < totalPages - 1) {
+        pageNumbers.push(<span key="ellipsis2">...</span>);
+      }
+
+      // Always show last page
+      pageNumbers.push(
+        <button
+          key={totalPages}
+          onClick={() => handlePageChange(totalPages)}
+          disabled={totalPages === currentPage}
+        >
+          {totalPages}
+        </button>
+      );
+    }
+
+    return pageNumbers;
+  };
+
   if (isLoading) {
     return <div>Loading images...</div>;
   }
@@ -146,43 +216,31 @@ const GalleryPage: React.FC = () => {
       <h1>Image Gallery</h1>
       <button onClick={handleNavigateHome}>Back to Home</button>
       <div className="image-grid">
-        {images
-          .slice((currentPage - 1) * imagesPerPage, currentPage * imagesPerPage)
-          .map((image) => (
-            <div key={image.id} className="image-container">
-              <img src={`${API_URL}${image.url}`} alt={`Image ${image.id}`} />
-              <select
-                value={image.label}
-                onChange={(e) => handleLabelChange(image.id, e.target.value)}
-              >
-                {labels.map((label, index) => (
-                  <option key={index} value={label}>{label}</option>
-                ))}
-              </select>
-            </div>
-          ))}
+        {images.map((image) => (
+          <div key={image.id} className="image-container">
+            <img src={`${API_URL}${image.url}`} alt={`Image ${image.id}`} />
+            <select
+              value={image.label}
+              onChange={(e) => handleLabelChange(image.id, e.target.value)}
+            >
+              {labels.map((label, index) => (
+                <option key={index} value={label}>{label}</option>
+              ))}
+            </select>
+          </div>
+        ))}
       </div>
       <div className="pagination">
         <button onClick={() => handlePageChange(1)} disabled={currentPage === 1}>First</button>
         <button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1}>Prev</button>
-        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-          <button
-            key={page}
-            onClick={() => handlePageChange(page)}
-            disabled={page === currentPage}
-          >
-            {page}
-          </button>
-        ))}
+        {renderPageNumbers()}
         <button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages}>Next</button>
         <button onClick={() => handlePageChange(totalPages)} disabled={currentPage === totalPages}>Last</button>
       </div>
       <p>Total Images: {totalImages}</p>
-      {currentPage === totalPages && (
-        <button onClick={handleDownload} disabled={isDownloading}>
-          {isDownloading ? <Spinner /> : 'Download All Labeled Images'}
-        </button>
-      )}
+      <button onClick={handleDownload} disabled={isDownloading}>
+        {isDownloading ? <Spinner /> : 'Download All Labeled Images'}
+      </button>
     </div>
   );
 };

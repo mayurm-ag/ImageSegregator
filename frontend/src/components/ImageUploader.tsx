@@ -61,6 +61,8 @@ const ImageUploader: React.FC = () => {
       setTotalImages(0);
       setPage(1);
       setLabels(['None']);
+      setSelectedFile(null);
+      setProgress(0);
     } catch (error) {
       console.error('Error clearing images:', error);
     }
