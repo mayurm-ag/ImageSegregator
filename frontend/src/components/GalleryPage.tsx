@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import Spinner from './Spinner';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://100.64.0.60:8000';
 
@@ -24,6 +25,8 @@ const GalleryPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const imagesPerPage = 20;
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [totalImages, setTotalImages] = useState(0);
 
   useEffect(() => {
     if (location.state && (location.state as any).labels) {
@@ -50,6 +53,7 @@ const GalleryPage: React.FC = () => {
         });
         return updatedImages;
       });
+      setTotalImages(response.data.total);
       setTotalPages(Math.ceil(response.data.total / imagesPerPage));
     } catch (error) {
       console.error('Error fetching images:', error);
@@ -67,6 +71,7 @@ const GalleryPage: React.FC = () => {
   };
 
   const handleDownload = async () => {
+    setIsDownloading(true);
     try {
       const allImages = await fetchAllImages();
       const imagesToDownload = allImages.map(img => ({
@@ -98,6 +103,8 @@ const GalleryPage: React.FC = () => {
     } catch (error) {
       console.error('Error downloading images:', error);
       alert('Error downloading images. Please try again.');
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -156,6 +163,8 @@ const GalleryPage: React.FC = () => {
           ))}
       </div>
       <div className="pagination">
+        <button onClick={() => handlePageChange(1)} disabled={currentPage === 1}>First</button>
+        <button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1}>Prev</button>
         {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
           <button
             key={page}
@@ -165,9 +174,14 @@ const GalleryPage: React.FC = () => {
             {page}
           </button>
         ))}
+        <button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages}>Next</button>
+        <button onClick={() => handlePageChange(totalPages)} disabled={currentPage === totalPages}>Last</button>
       </div>
+      <p>Total Images: {totalImages}</p>
       {currentPage === totalPages && (
-        <button onClick={handleDownload}>Download All Labeled Images</button>
+        <button onClick={handleDownload} disabled={isDownloading}>
+          {isDownloading ? <Spinner /> : 'Download All Labeled Images'}
+        </button>
       )}
     </div>
   );

@@ -41,8 +41,10 @@ const ImageUploader: React.FC = () => {
   const imagesPerPage = 20;
 
   useEffect(() => {
-    console.log('Component mounted or page refreshed');
     clearImages();
+    return () => {
+      clearImages();
+    };
   }, []);
 
   useEffect(() => {
