@@ -4,6 +4,7 @@ import axios from 'axios';
 import Spinner from './Spinner';
 import 'react-toastify/dist/ReactToastify.css';
 import { saveAs } from 'file-saver';
+import './GalleryPage.css';
 
 const API_URL = process.env.REACT_APP_API_URL || '';
 
@@ -30,6 +31,7 @@ const GalleryPage: React.FC = () => {
   const imagesPerPage = 20;
   const [isDownloading, setIsDownloading] = useState(false);
   const [totalImages, setTotalImages] = useState(0);
+  const [selectedImage, setSelectedImage] = useState<Image | null>(null);
 
   const fetchImages = useCallback(async (page: number) => {
     setIsLoading(true);
@@ -120,6 +122,14 @@ const GalleryPage: React.FC = () => {
     navigate('/');
   };
 
+  const handleImageClick = (image: Image) => {
+    setSelectedImage(image);
+  };
+
+  const closeModal = () => {
+    setSelectedImage(null);
+  };
+
   const renderPageNumbers = () => {
     const pageNumbers: JSX.Element[] = [];
     const totalPageNumbers = 7;
@@ -182,7 +192,7 @@ const GalleryPage: React.FC = () => {
         <button
           key={totalPages}
           onClick={() => handlePageChange(totalPages)}
-          disabled={totalPages === currentPage}
+          disabled={currentPage === totalPages}
         >
           {totalPages}
         </button>
@@ -211,7 +221,12 @@ const GalleryPage: React.FC = () => {
           <div className="image-grid">
             {images.map((image: Image) => (
               <div key={image.id} className="image-container">
-                <img src={image.url} alt={`Image ${image.id}`} />
+                <img 
+                  src={image.url} 
+                  alt={`Image ${image.id}`} 
+                  onClick={() => handleImageClick(image)}
+                  className="thumbnail"
+                />
                 <select
                   value={image.label}
                   onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleLabelChange(image.id, e.target.value)}
@@ -223,6 +238,18 @@ const GalleryPage: React.FC = () => {
               </div>
             ))}
           </div>
+          {selectedImage && (
+            <div className="modal" onClick={closeModal}>
+              <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                <img 
+                  src={selectedImage.url} 
+                  alt={`Full size ${selectedImage.id}`}
+                  className="full-size-image"
+                />
+                <button onClick={closeModal}>Close</button>
+              </div>
+            </div>
+          )}
           <div className="pagination">
             <button onClick={() => handlePageChange(1)} disabled={currentPage === 1}>First</button>
             <button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1}>Prev</button>
