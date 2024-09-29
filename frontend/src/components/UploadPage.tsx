@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Spinner from './Spinner';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://100.64.0.60:8000';
+const API_URL = process.env.REACT_APP_API_URL;
 
 const UploadPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);

@@ -5,7 +5,7 @@ import Spinner from './Spinner';
 import 'react-toastify/dist/ReactToastify.css';
 import { saveAs } from 'file-saver';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://100.64.0.60:8000';
+const API_URL = process.env.REACT_APP_API_URL || '';
 
 interface Image {
   id: number;
@@ -38,7 +38,10 @@ const GalleryPage: React.FC = () => {
       const response = await axios.get<{ images: Image[], total: number }>(`${API_URL}/api/images`, {
         params: { page, limit: imagesPerPage }
       });
-      setImages(response.data.images);
+      setImages(response.data.images.map(img => ({
+        ...img,
+        url: API_URL ? img.url.replace(/^http:\/\/[^/]+/, API_URL) : img.url
+      })));
       setTotalImages(response.data.total);
       setTotalPages(Math.ceil(response.data.total / imagesPerPage));
     } catch (error) {

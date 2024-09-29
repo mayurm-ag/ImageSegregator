@@ -36,7 +36,7 @@ app = FastAPI()
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://100.64.0.60:3000"],  # Make sure this matches your frontend URL
+    allow_origins=[os.getenv("FRONTEND_URL", "http://localhost:3000")],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -158,7 +158,7 @@ async def get_images(page: int = 1, limit: int = 20):
         "images": [
             {
                 "id": img.id,
-                "url": f"http://100.64.0.60:8000{img.url}",
+                "url": f"{os.getenv('SERVER_URL', 'http://localhost:8000')}{img.url}",
                 "label": img.label
             } for img in images
         ],
