@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Spinner from './Spinner';
 import 'react-toastify/dist/ReactToastify.css';
@@ -11,22 +11,15 @@ const API_URL = process.env.REACT_APP_API_URL || '';
 interface Image {
   id: number;
   url: string;
-  label: string;
-}
-
-interface ApiImage {
-  id: number;
-  url: string;
 }
 
 const GalleryPage: React.FC = () => {
   const [images, setImages] = useState<Image[]>([]);
+  const [selectedImages, setSelectedImages] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [labels, setLabels] = useState<string[]>(['None']);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const location = useLocation();
   const navigate = useNavigate();
   const imagesPerPage = 20;
   const [isDownloading, setIsDownloading] = useState(false);
@@ -55,63 +48,40 @@ const GalleryPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (location.state && (location.state as any).labels) {
-      setLabels((location.state as any).labels);
-    }
     fetchImages(currentPage);
-  }, [currentPage, location.state, fetchImages]);
+  }, [currentPage, fetchImages]);
 
-  const handleLabelChange = async (imageId: number, newLabel: string) => {
-    try {
-      await axios.post(`${API_URL}/api/update-label`, { image_id: imageId, label: newLabel });
-      setImages(prevImages =>
-        prevImages.map(img =>
-          img.id === imageId ? { ...img, label: newLabel } : img
-        )
-      );
-    } catch (error) {
-      console.error('Error updating label:', error);
-    }
+  const handleImageSelect = (imageId: number) => {
+    setSelectedImages(prevSelected => {
+      const newSelected = new Set(prevSelected);
+      if (newSelected.has(imageId)) {
+        newSelected.delete(imageId);
+      } else {
+        newSelected.add(imageId);
+      }
+      return newSelected;
+    });
   };
 
   const handleDownload = async () => {
     setIsDownloading(true);
     try {
-      const response = await axios.get(`${API_URL}/api/download-all-images`, {
-        responseType: 'blob',
-      });
+      const response = await axios.post(
+        `${API_URL}/api/download-selected-images`,
+        { selectedIds: Array.from(selectedImages) },
+        { responseType: 'blob' }
+      );
 
       const blob = new Blob([response.data], { type: 'application/zip' });
-      saveAs(blob, 'labeled_images.zip');
+      saveAs(blob, 'selected_images.zip');
 
-      console.log('Images downloaded successfully!');
+      console.log('Selected images downloaded successfully!');
     } catch (error) {
       console.error('Error downloading images:', error);
-      console.error('An error occurred while downloading images. Please try again.');
+      alert('An error occurred while downloading images. Please try again.');
     } finally {
       setIsDownloading(false);
     }
-  };
-
-  const fetchAllImages = async (): Promise<Image[]> => {
-    let allImages: Image[] = [];
-    let page = 1;
-    let hasMoreImages = true;
-
-    while (hasMoreImages) {
-      const response = await axios.get<{ images: ApiImage[], total: number }>(`${API_URL}/api/images`, {
-        params: { page, limit: 1000 }
-      });
-      const newImages = response.data.images.map((img: ApiImage) => ({ ...img, label: 'None' }));
-      allImages = [...allImages, ...newImages];
-      hasMoreImages = newImages.length === 1000;
-      page++;
-    }
-
-    return allImages.map(img => {
-      const matchingImage = images.find((i: Image) => i.id === img.id);
-      return matchingImage ? { ...img, label: matchingImage.label } : img;
-    });
   };
 
   const handlePageChange = (newPage: number) => {
@@ -227,14 +197,11 @@ const GalleryPage: React.FC = () => {
                   onClick={() => handleImageClick(image)}
                   className="thumbnail"
                 />
-                <select
-                  value={image.label}
-                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleLabelChange(image.id, e.target.value)}
-                >
-                  {labels.map((label: string, index: number) => (
-                    <option key={index} value={label}>{label}</option>
-                  ))}
-                </select>
+                <input
+                  type="checkbox"
+                  checked={selectedImages.has(image.id)}
+                  onChange={() => handleImageSelect(image.id)}
+                />
               </div>
             ))}
           </div>
@@ -258,8 +225,8 @@ const GalleryPage: React.FC = () => {
             <button onClick={() => handlePageChange(totalPages)} disabled={currentPage === totalPages}>Last</button>
           </div>
           <p>Total Images: {totalImages}</p>
-          <button onClick={handleDownload} disabled={isDownloading}>
-            {isDownloading ? <Spinner /> : 'Download All Labeled Images'}
+          <button onClick={handleDownload} disabled={isDownloading || selectedImages.size === 0}>
+            {isDownloading ? <Spinner /> : `Download Selected Images (${selectedImages.size})`}
           </button>
         </>
       )}

@@ -9,8 +9,6 @@ const UploadPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [labels, setLabels] = useState<string[]>(['None']);
-  const [newLabel, setNewLabel] = useState('');
   const [uploadComplete, setUploadComplete] = useState(false);
   const navigate = useNavigate();
 
@@ -18,17 +16,6 @@ const UploadPage: React.FC = () => {
     if (event.target.files && event.target.files[0]) {
       setSelectedFile(event.target.files[0]);
     }
-  };
-
-  const handleAddLabel = () => {
-    if (newLabel && !labels.includes(newLabel)) {
-      setLabels([...labels, newLabel]);
-      setNewLabel('');
-    }
-  };
-
-  const handleDeleteLabel = (labelToDelete: string) => {
-    setLabels(labels.filter(label => label !== labelToDelete));
   };
 
   const handleUpload = async () => {
@@ -65,7 +52,7 @@ const UploadPage: React.FC = () => {
   };
 
   const handleProceed = () => {
-    navigate('/gallery', { state: { labels } });
+    navigate('/gallery');
   };
 
   return (
@@ -82,29 +69,6 @@ const UploadPage: React.FC = () => {
           <p>{progress}% Uploaded</p>
         </div>
       )}
-      <div className="label-section">
-        <h2>Add Labels</h2>
-        <input
-          type="text"
-          value={newLabel}
-          onChange={(e) => setNewLabel(e.target.value)}
-          placeholder="Enter new label"
-        />
-        <button onClick={handleAddLabel}>Add Label</button>
-        <div className="label-list">
-          <h3>Current Labels:</h3>
-          <ul>
-            {labels.map((label, index) => (
-              <li key={index}>
-                {label}
-                {label !== 'None' && (
-                  <button onClick={() => handleDeleteLabel(label)}>Delete</button>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
       {uploadComplete && (
         <button className="proceed-button" onClick={handleProceed}>
           Proceed to Gallery

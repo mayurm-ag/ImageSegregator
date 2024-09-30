@@ -214,6 +214,36 @@ async def download_all_images():
     finally:
         db.close()
 
+class SelectedImages(BaseModel):
+    selectedIds: List[int]
+
+@app.post("/api/download-selected-images")
+async def download_selected_images(selected_images: SelectedImages):
+    try:
+        db = SessionLocal()
+        images = db.query(Image).filter(Image.id.in_(selected_images.selectedIds)).all()
+        
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            for image in images:
+                file_path = os.path.join("uploads", image.filename)
+                if os.path.exists(file_path):
+                    zip_file.write(file_path, arcname=image.filename)
+                else:
+                    logger.warning(f"File not found: {file_path}")
+
+        buffer.seek(0)
+        return StreamingResponse(
+            io.BytesIO(buffer.getvalue()),
+            media_type="application/zip",
+            headers={"Content-Disposition": f"attachment; filename=selected_images.zip"}
+        )
+    except Exception as e:
+        logger.error(f"Error creating zip file for selected images: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error creating zip file: {str(e)}")
+    finally:
+        db.close()
+
 # ... (keep other existing routes and functions)
 
 if __name__ == "__main__":
