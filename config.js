@@ -1,5 +1,5 @@
 const config = {
-  serverIP: '10.179.100.19',
+  serverIP: '100.64.0.60',
   // You can add other configuration variables here
 };
 
